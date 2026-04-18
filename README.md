@@ -1,76 +1,61 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
-    <meta charset="UTF-8">
-    <title>Infinite Dark Brainstorming</title>
+    <meta charset="UTF-8"> <title>Infinite Dark Brainstorming CZ</title>
     <style>
         body { 
             margin: 0; padding: 0; overflow: hidden; 
-            background-color: #121212; /* Temné pozadí */
-            color: white; font-family: sans-serif; 
+            background-color: #121212; 
+            color: white; 
+            /* Použijeme fonty, které umí česky na 100 % */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
         }
 
-        /* Hlavní kontejner, který zabírá celou obrazovku */
-        #viewport {
-            width: 100vw; height: 100vh;
-            cursor: grab;
-            position: relative;
-        }
-
-        /* Skutečná plocha, kterou budeme posouvat a zvětšovat */
-        #world {
-            position: absolute;
-            top: 0; left: 0;
-            transform-origin: 0 0;
-        }
-
-        #line-canvas {
-            position: absolute;
-            top: 0; left: 0;
-            pointer-events: none;
-        }
+        #viewport { width: 100vw; height: 100vh; cursor: grab; position: relative; }
+        #world { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+        #line-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
 
         .bubble { 
             padding: 15px; 
-            background: #333; /* Tmavší bubliny */
-            color: #fff;
-            border: 1px solid #444;
-            border-radius: 8px; 
+            background: #2a2a2a; 
+            color: #ffffff;
+            border: 2px solid #444;
+            border-radius: 12px; 
             position: absolute; 
-            cursor: text; 
-            min-width: 120px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            cursor: move; /* Kurzor naznačuje, že s tím jde hýbat */
+            min-width: 140px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.6);
             z-index: 2;
             outline: none;
+            transition: border-color 0.2s;
         }
-        .bubble:focus { border-color: #007bff; background: #3d3d3d; }
+        
+        /* Styl při psaní */
+        .bubble:focus { border-color: #007bff; background: #333; cursor: text; }
 
-        /* UI Prvky */
-        .controls {
-            position: fixed; top: 20px; left: 20px; z-index: 100;
-            display: flex; gap: 10px;
-        }
+        .controls { position: fixed; top: 20px; left: 20px; z-index: 100; display: flex; gap: 10px; }
         button { 
-            padding: 10px 15px; background: #007bff; color: white; 
-            border: none; border-radius: 5px; cursor: pointer; font-weight: bold;
+            padding: 12px 18px; background: #007bff; color: white; 
+            border: none; border-radius: 6px; cursor: pointer; font-weight: bold;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
         button:hover { background: #0056b3; }
-        .hint { position: fixed; bottom: 20px; left: 20px; color: #666; font-size: 0.8em; }
+        .hint { position: fixed; bottom: 20px; left: 20px; color: #888; font-size: 0.9em; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 4px; }
     </style>
 </head>
 <body>
 
     <div class="controls">
-        <button onclick="addNode()">+ Nová myšlenka</button>
+        <button onclick="addNode()">+ Nový nápad (háčky/čárky)</button>
         <button onclick="resetView()">Střed</button>
     </div>
 
-    <div class="hint">Kolečko: Zoom | Levá myš: Táhnout plochu | Klik do bubliny: Psát</div>
+    <div class="hint">Levá myš na pozadí: Posun plochy | Levá myš na bublinu: Přesun bubliny | Klik a psaní: Č, Š, Ž... OK!</div>
 
     <div id="viewport">
         <div id="world">
             <canvas id="line-canvas"></canvas>
-            </div>
+        </div>
     </div>
 
     <script>
@@ -86,8 +71,7 @@
         let isDraggingView = false;
         let startX, startY;
 
-        // --- NASTAVENÍ PLOCHY (PAN & ZOOM) ---
-
+        // --- PAN & ZOOM ---
         viewport.onmousedown = function(e) {
             if (e.target === viewport) {
                 isDraggingView = true;
@@ -114,8 +98,7 @@
             e.preventDefault();
             const delta = e.deltaY > 0 ? 0.9 : 1.1;
             scale *= delta;
-            // Omezení zoomu
-            scale = Math.min(Math.max(0.1, scale), 3);
+            scale = Math.min(Math.max(0.2, scale), 3);
             updateWorldTransform();
         };
 
@@ -129,60 +112,71 @@
             updateWorldTransform();
         }
 
-        // --- LOGIKA BUBLIN ---
-
+        // --- BUBLINY ---
         function addNode() {
             const node = document.createElement('div');
             node.className = 'bubble';
             node.contentEditable = true;
-            node.innerText = 'Napiš něco...';
+            node.innerText = 'Příliš žluťoučký kůň...'; // Český testovací text
             
-            // Umístění do středu aktuálního pohledu
             const x = (window.innerWidth / 2 - posX) / scale;
             const y = (window.innerHeight / 2 - posY) / scale;
             
             node.style.left = x + 'px';
             node.style.top = y + 'px';
 
-            // Aby nezačal drag, když chceme psát
-            node.onmousedown = (e) => e.stopPropagation();
+            // PŘETAHOVÁNÍ BUBLIN V RÁMCI SVĚTA
+            node.onmousedown = function(e) {
+                e.stopPropagation(); // Zabránit posunu celé plochy
+                
+                // Pokud už v bublině píšeme, nechceme ji hned stěhovat
+                if (document.activeElement === node) return;
+
+                let bStartX = e.clientX / scale - parseInt(node.style.left);
+                let bStartY = e.clientY / scale - parseInt(node.style.top);
+
+                function onMoveBubble(ev) {
+                    node.style.left = (ev.clientX / scale - bStartX) + 'px';
+                    node.style.top = (ev.clientY / scale - bStartY) + 'px';
+                    drawLines();
+                }
+
+                document.addEventListener('mousemove', onMoveBubble);
+                document.onmouseup = function() {
+                    document.removeEventListener('mousemove', onMoveBubble);
+                    document.onmouseup = null;
+                };
+            };
 
             world.appendChild(node);
             nodes.push(node);
-            
-            // Automaticky upravit canvas při přidání
-            resizeCanvas();
             node.oninput = drawLines;
-        }
-
-        function resizeCanvas() {
-            // Nastavíme canvas jako obrovský, aby pokryl i vzdálené bubliny
-            canvas.width = 5000; 
-            canvas.height = 5000;
-            canvas.style.left = "-2500px";
-            canvas.style.top = "-2500px";
             drawLines();
         }
 
         function drawLines() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.strokeStyle = "#444";
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2 / scale; // Aby čára nebyla tlustá při zoomu
+
+            canvas.width = 10000; // Ještě větší rezerva
+            canvas.height = 10000;
+            canvas.style.left = "-5000px";
+            canvas.style.top = "-5000px";
 
             if (nodes.length < 2) return;
 
             ctx.beginPath();
             nodes.forEach((node, i) => {
-                const x = node.offsetLeft + node.offsetWidth / 2 + 2500;
-                const y = node.offsetTop + node.offsetHeight / 2 + 2500;
+                const x = node.offsetLeft + node.offsetWidth / 2 + 5000;
+                const y = node.offsetTop + node.offsetHeight / 2 + 5000;
                 if (i === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
             });
             ctx.stroke();
         }
 
-        window.onresize = resizeCanvas;
-        resizeCanvas();
+        window.onload = () => { resetView(); drawLines(); };
     </script>
 </body>
 </html>
