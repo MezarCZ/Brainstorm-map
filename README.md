@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Infinite Brainstorming Color Edition</title>
+    <title>Infinite Brainstorming Groups</title>
     <style>
         body { 
             margin: 0; padding: 0; overflow: hidden; 
@@ -70,7 +70,7 @@
         document.getElementById('addBtn').innerText = "Nov\u00E1 my\u0161lenka";
         document.getElementById('saveBtn').innerText = "Ulo\u017Eit projekt";
         document.getElementById('loadBtn').innerText = "Otev\u0159\u00EDt projekt";
-        document.getElementById('hint-box').innerText = "Lev\u00E1 my\u0161 na pozad\u00ED: Posun plochy | Prav\u00E9 tla\u010D\u00EDtko: Smazat | Vyber barvu a p\u0159idej my\u0161lenku.";
+        document.getElementById('hint-box').innerText = "Ka\u017Ed\u00E1 barva tvo\u0159\u00ED vlastn\u00ED v\u011Btev vych\u00E1zej\u00EDc\u00ED z prvn\u00ED bubliny.";
 
         const viewport = document.getElementById('viewport');
         const world = document.getElementById('world');
@@ -126,7 +126,7 @@
             node.oncontextmenu = (e) => {
                 e.preventDefault();
                 node.remove();
-                nodes = nodes.filter(n => n !== node);
+                nodes = nodes.filter(n => n.el !== node);
                 saveToLocalStorage();
                 drawLines();
             };
@@ -157,73 +157,15 @@
         function addNode() {
             const x = (window.innerWidth / 2 - posX) / scale;
             const y = (window.innerHeight / 2 - posY) / scale;
-            const node = createBubbleElement(x, y);
-            nodes.push(node);
-            setTimeout(() => node.focus(), 10);
-            drawLines();
-            saveToLocalStorage();
-        }
-
-        function drawLines() {
-            canvas.width = 10000; canvas.height = 10000;
-            canvas.style.left = "-5000px"; canvas.style.top = "-5000px";
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.lineWidth = 3 / scale;
-
-            if (nodes.length < 2) return;
-
-            for (let i = 1; i < nodes.length; i++) {
-                const prev = nodes[i-1];
-                const curr = nodes[i];
-                
-                const x1 = prev.offsetLeft + prev.offsetWidth / 2 + 5000;
-                const y1 = prev.offsetTop + prev.offsetHeight / 2 + 5000;
-                const x2 = curr.offsetLeft + curr.offsetWidth / 2 + 5000;
-                const y2 = curr.offsetTop + curr.offsetHeight / 2 + 5000;
-
-                // Čára má barvu bubliny, ke které vede
-                ctx.strokeStyle = curr.dataset.color;
-                ctx.beginPath();
-                ctx.moveTo(x1, y1);
-                ctx.lineTo(x2, y2);
-                ctx.stroke();
-            }
-        }
-
-        function saveToLocalStorage() {
-            const data = nodes.map(n => ({ x: n.style.left, y: n.style.top, text: n.innerText, color: n.dataset.color }));
-            localStorage.setItem('myColorMap', JSON.stringify(data));
-        }
-
-        function exportToFile() {
-            const data = nodes.map(n => ({ x: n.style.left, y: n.style.top, text: n.innerText, color: n.dataset.color }));
-            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'barevna-mapa.json'; a.click();
-        }
-
-        function importFromFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => loadFromData(JSON.parse(e.target.result));
-            reader.readAsText(file);
-        }
-
-        function loadFromData(data) {
-            nodes.forEach(n => n.remove());
-            nodes = [];
-            data.forEach(d => nodes.push(createBubbleElement(parseInt(d.x), parseInt(d.y), d.text, d.color)));
-            drawLines();
-            saveToLocalStorage();
-        }
-
-        window.onload = () => {
-            const saved = localStorage.getItem('myColorMap');
-            if (saved) loadFromData(JSON.parse(saved));
-            updateWorldTransform();
-        };
-    </script>
-</body>
-</html>
+            const color = currentColor;
+            const el = createBubbleElement(x, y, '', color);
+            
+            // Logika hledání rodiče pro čáru
+            let parent = null;
+            if (nodes.length > 0) {
+                // Hledáme poslední bublinu stejné barvy
+                const sameColorNodes = nodes.filter(n => n.color === color);
+                if (sameColorNodes.length > 0) {
+                    parent = sameColorNodes[sameColorNodes.length - 1];
+                } else {
+                    // Pokud je to první bublina téhle barvy, připoj
