@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Brainstorming Independent Groups</title>
+    <title>Brainstorming App - Final Fix</title>
     <style>
         body { 
             margin: 0; padding: 0; overflow: hidden; 
@@ -41,7 +41,7 @@
 <body>
 
     <div class="controls-left">
-        <button id="addBtn" onclick="addNode()">Nova myslenka</button>
+        <button id="addBtn" onclick="addNode()">Nová myšlenka</button>
         <div class="color-picker" id="picker">
             <div class="color-dot active" style="background: #2a2a2a;" onclick="selectColor('#2a2a2a', this)"></div>
             <div class="color-dot" style="background: #e74c3c;" onclick="selectColor('#e74c3c', this)"></div>
@@ -53,12 +53,12 @@
     </div>
 
     <div class="controls-right">
-        <button class="btn-save" id="saveBtn" onclick="exportToFile()">Ulozit</button>
-        <button id="loadBtn" onclick="document.getElementById('fileInput').click()">Otevrit</button>
+        <button class="btn-save" id="saveBtn" onclick="exportToFile()">Uložit projekt</button>
+        <button id="loadBtn" onclick="document.getElementById('fileInput').click()">Otevřít projekt</button>
         <input type="file" id="fileInput" style="display:none" onchange="importFromFile(event)">
     </div>
 
-    <div id="hint-box" class="hint">Kazda barva je samostatna skupina. Prave tlacitko maze.</div>
+    <div id="hint-box" class="hint">Každá barva je samostatná větev. Pravé tlačítko maže.</div>
 
     <div id="viewport">
         <div id="world">
@@ -67,13 +67,6 @@
     </div>
 
     <script>
-        // Oprava textu pro cestinu
-        const cz = (t) => decodeURIComponent(escape(t));
-        document.getElementById('addBtn').textContent = cz("Nová myšlenka");
-        document.getElementById('saveBtn').textContent = cz("Uložit projekt");
-        document.getElementById('loadBtn').textContent = cz("Otevřít projekt");
-        document.getElementById('hint-box').textContent = cz("Bubliny stejné barvy se propojují. Různé barvy jsou nezávislé.");
-
         const viewport = document.getElementById('viewport');
         const world = document.getElementById('world');
         const canvas = document.getElementById('line-canvas');
@@ -90,6 +83,7 @@
             el.classList.add('active');
         }
 
+        // PAN & ZOOM
         viewport.onmousedown = (e) => {
             if (e.target === viewport) {
                 isDraggingView = true;
@@ -103,7 +97,6 @@
             }
         };
         window.onmouseup = () => isDraggingView = false;
-        
         viewport.onwheel = (e) => {
             e.preventDefault();
             const delta = e.deltaY > 0 ? 0.9 : 1.1;
@@ -116,6 +109,7 @@
             drawLines();
         }
 
+        // BUBLINY
         function createBubbleElement(x, y, text = '', color) {
             const node = document.createElement('div');
             node.className = 'bubble';
@@ -163,7 +157,7 @@
             const color = currentColor;
             const el = createBubbleElement(x, y, '', color);
             
-            // Hledáme poslední bublinu POUZE stejné barvy
+            // Najde poslední uzel STEJNÉ barvy pro propojení
             const sameColorNodes = nodes.filter(n => n.color === color);
             const parent = sameColorNodes.length > 0 ? sameColorNodes[sameColorNodes.length - 1] : null;
 
@@ -180,7 +174,6 @@
             ctx.lineWidth = 3 / scale;
 
             nodes.forEach(node => {
-                // Kreslíme čáru JEN když má uzel rodiče (tzn. je to aspoň druhá bublina té barvy)
                 if (node.parent) {
                     const p = node.parent.el;
                     const c = node.el;
@@ -199,12 +192,12 @@
                 x: n.el.style.left, y: n.el.style.top, text: n.el.innerText, color: n.color,
                 parentIdx: nodes.indexOf(n.parent) 
             }));
-            localStorage.setItem('myIndependentMap', JSON.stringify(data));
+            localStorage.setItem('myFinalMap', JSON.stringify(data));
         }
 
         function exportToFile() {
             saveToLocalStorage();
-            const data = localStorage.getItem('myIndependentMap');
+            const data = localStorage.getItem('myFinalMap');
             const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -212,30 +205,4 @@
         }
 
         function importFromFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => loadFromData(JSON.parse(e.target.result));
-            reader.readAsText(file);
-        }
-
-        function loadFromData(data) {
-            nodes.forEach(n => n.el.remove());
-            nodes = [];
-            data.forEach(d => {
-                const el = createBubbleElement(parseInt(d.x), parseInt(d.y), d.text, d.color);
-                nodes.push({ el, color: d.color, parent: null });
-            });
-            data.forEach((d, i) => { if (d.parentIdx !== -1) nodes[i].parent = nodes[d.parentIdx]; });
-            drawLines();
-            saveToLocalStorage();
-        }
-
-        window.onload = () => {
-            const saved = localStorage.getItem('myIndependentMap');
-            if (saved) loadFromData(JSON.parse(saved));
-            updateWorldTransform();
-        };
-    </script>
-</body>
-</html>
+            const file = event.target.
