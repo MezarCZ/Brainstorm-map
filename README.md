@@ -41,7 +41,7 @@
 <body>
 
     <div class="controls-left">
-        <button id="addBtn" onclick="addNode()">Nová myšlenka</button>
+        <button id="addBtn" onclick="addNode()">...</button>
         <div class="color-picker" id="picker">
             <div class="color-dot active" style="background: #2a2a2a;" onclick="selectColor('#2a2a2a', this)"></div>
             <div class="color-dot" style="background: #e74c3c;" onclick="selectColor('#e74c3c', this)"></div>
@@ -53,12 +53,12 @@
     </div>
 
     <div class="controls-right">
-        <button class="btn-save" id="saveBtn" onclick="exportToFile()">Uložit projekt</button>
-        <button id="loadBtn" onclick="document.getElementById('fileInput').click()">Otevřít projekt</button>
+        <button class="btn-save" id="saveBtn" onclick="exportToFile()">...</button>
+        <button id="loadBtn" onclick="document.getElementById('fileInput').click()">...</button>
         <input type="file" id="fileInput" style="display:none" onchange="importFromFile(event)">
     </div>
 
-    <div id="hint-box" class="hint">Každá barva je samostatná větev. Pravé tlačítko maže.</div>
+    <div id="hint-box" class="hint">...</div>
 
     <div id="viewport">
         <div id="world">
@@ -67,6 +67,12 @@
     </div>
 
     <script>
+        // Oprava textu pres Unicode - uz zadne otazniky!
+        document.getElementById('addBtn').textContent = "Nov\u00E1 my\u0161lenka";
+        document.getElementById('saveBtn').textContent = "Ulo\u017Eit projekt";
+        document.getElementById('loadBtn').textContent = "Otev\u0159\u00EDt projekt";
+        document.getElementById('hint-box').textContent = "Barvy tvo\u0159\u00ED samostatn\u00E9 v\u011Btve. Prav\u00E9 tla\u010D\u00EDtko ma\u017Ee.";
+
         const viewport = document.getElementById('viewport');
         const world = document.getElementById('world');
         const canvas = document.getElementById('line-canvas');
@@ -83,7 +89,6 @@
             el.classList.add('active');
         }
 
-        // PAN & ZOOM
         viewport.onmousedown = (e) => {
             if (e.target === viewport) {
                 isDraggingView = true;
@@ -97,6 +102,7 @@
             }
         };
         window.onmouseup = () => isDraggingView = false;
+        
         viewport.onwheel = (e) => {
             e.preventDefault();
             const delta = e.deltaY > 0 ? 0.9 : 1.1;
@@ -109,12 +115,11 @@
             drawLines();
         }
 
-        // BUBLINY
-        function createBubbleElement(x, y, text = '', color) {
+        function createBubbleElement(x, y, text, color) {
             const node = document.createElement('div');
             node.className = 'bubble';
             node.contentEditable = true;
-            node.innerText = text;
+            node.innerText = text || "";
             node.style.left = x + 'px';
             node.style.top = y + 'px';
             node.style.background = color;
@@ -157,7 +162,7 @@
             const color = currentColor;
             const el = createBubbleElement(x, y, '', color);
             
-            // Najde poslední uzel STEJNÉ barvy pro propojení
+            // Samostatne vetve podle barev
             const sameColorNodes = nodes.filter(n => n.color === color);
             const parent = sameColorNodes.length > 0 ? sameColorNodes[sameColorNodes.length - 1] : null;
 
@@ -192,12 +197,12 @@
                 x: n.el.style.left, y: n.el.style.top, text: n.el.innerText, color: n.color,
                 parentIdx: nodes.indexOf(n.parent) 
             }));
-            localStorage.setItem('myFinalMap', JSON.stringify(data));
+            localStorage.setItem('myGroupMapVFinal', JSON.stringify(data));
         }
 
         function exportToFile() {
             saveToLocalStorage();
-            const data = localStorage.getItem('myFinalMap');
+            const data = localStorage.getItem('myGroupMapVFinal');
             const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -205,4 +210,30 @@
         }
 
         function importFromFile(event) {
-            const file = event.target.
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => loadFromData(JSON.parse(e.target.result));
+            reader.readAsText(file);
+        }
+
+        function loadFromData(data) {
+            nodes.forEach(n => n.el.remove());
+            nodes = [];
+            data.forEach(d => {
+                const el = createBubbleElement(parseInt(d.x), parseInt(d.y), d.text, d.color);
+                nodes.push({ el, color: d.color, parent: null });
+            });
+            data.forEach((d, i) => { if (d.parentIdx !== -1) nodes[i].parent = nodes[d.parentIdx]; });
+            drawLines();
+            saveToLocalStorage();
+        }
+
+        window.onload = () => {
+            const saved = localStorage.getItem('myGroupMapVFinal');
+            if (saved) loadFromData(JSON.parse(saved));
+            updateWorldTransform();
+        };
+    </script>
+</body>
+</html>
