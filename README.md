@@ -2,12 +2,12 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Infinite Brainstorming Groups</title>
+    <title>Brainstorming Independent Groups</title>
     <style>
         body { 
             margin: 0; padding: 0; overflow: hidden; 
             background-color: #121212; color: white; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            font-family: sans-serif; 
         }
         #viewport { width: 100vw; height: 100vh; cursor: grab; position: relative; }
         #world { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
@@ -25,8 +25,8 @@
         .controls-right { position: fixed; top: 20px; right: 20px; z-index: 100; display: flex; gap: 10px; }
 
         .color-picker { display: flex; gap: 5px; background: rgba(255,255,255,0.1); padding: 5px; border-radius: 8px; }
-        .color-dot { width: 25px; height: 25px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
-        .color-dot.active { border-color: white; transform: scale(1.1); }
+        .color-dot { width: 25px; height: 25px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
+        .color-dot.active { border-color: white; transform: scale(1.2); }
 
         button { 
             padding: 12px 18px; background: #007bff; color: white; 
@@ -41,7 +41,7 @@
 <body>
 
     <div class="controls-left">
-        <button id="addBtn" onclick="addNode()">Nová myšlenka</button>
+        <button id="addBtn" onclick="addNode()">Nova myslenka</button>
         <div class="color-picker" id="picker">
             <div class="color-dot active" style="background: #2a2a2a;" onclick="selectColor('#2a2a2a', this)"></div>
             <div class="color-dot" style="background: #e74c3c;" onclick="selectColor('#e74c3c', this)"></div>
@@ -53,12 +53,12 @@
     </div>
 
     <div class="controls-right">
-        <button class="btn-save" id="saveBtn" onclick="exportToFile()">Uložit projekt</button>
-        <button id="loadBtn" onclick="document.getElementById('fileInput').click()">Otevřít projekt</button>
+        <button class="btn-save" id="saveBtn" onclick="exportToFile()">Ulozit</button>
+        <button id="loadBtn" onclick="document.getElementById('fileInput').click()">Otevrit</button>
         <input type="file" id="fileInput" style="display:none" onchange="importFromFile(event)">
     </div>
 
-    <div id="hint-box" class="hint"></div>
+    <div id="hint-box" class="hint">Kazda barva je samostatna skupina. Prave tlacitko maze.</div>
 
     <div id="viewport">
         <div id="world">
@@ -67,10 +67,12 @@
     </div>
 
     <script>
-        document.getElementById('addBtn').innerText = "Nov\u00E1 my\u0161lenka";
-        document.getElementById('saveBtn').innerText = "Ulo\u017Eit projekt";
-        document.getElementById('loadBtn').innerText = "Otev\u0159\u00EDt projekt";
-        document.getElementById('hint-box').innerText = "Ka\u017Ed\u00E1 barva tvo\u0159\u00ED vlastn\u00ED v\u011Btev vych\u00E1zej\u00EDc\u00ED z prvn\u00ED bubliny.";
+        // Oprava textu pro cestinu
+        const cz = (t) => decodeURIComponent(escape(t));
+        document.getElementById('addBtn').textContent = cz("Nová myšlenka");
+        document.getElementById('saveBtn').textContent = cz("Uložit projekt");
+        document.getElementById('loadBtn').textContent = cz("Otevřít projekt");
+        document.getElementById('hint-box').textContent = cz("Bubliny stejné barvy se propojují. Různé barvy jsou nezávislé.");
 
         const viewport = document.getElementById('viewport');
         const world = document.getElementById('world');
@@ -101,6 +103,7 @@
             }
         };
         window.onmouseup = () => isDraggingView = false;
+        
         viewport.onwheel = (e) => {
             e.preventDefault();
             const delta = e.deltaY > 0 ? 0.9 : 1.1;
@@ -120,8 +123,8 @@
             node.innerText = text;
             node.style.left = x + 'px';
             node.style.top = y + 'px';
-            node.style.background = color || currentColor;
-            node.dataset.color = color || currentColor;
+            node.style.background = color;
+            node.dataset.color = color;
 
             node.oncontextmenu = (e) => {
                 e.preventDefault();
@@ -160,18 +163,9 @@
             const color = currentColor;
             const el = createBubbleElement(x, y, '', color);
             
-            // Logika hledání rodiče pro čáru
-            let parent = null;
-            if (nodes.length > 0) {
-                // Hledáme poslední bublinu stejné barvy
-                const sameColorNodes = nodes.filter(n => n.color === color);
-                if (sameColorNodes.length > 0) {
-                    parent = sameColorNodes[sameColorNodes.length - 1];
-                } else {
-                    // Pokud je to první bublina téhle barvy, připoj ji k úplně první bublině (středu)
-                    parent = nodes[0];
-                }
-            }
+            // Hledáme poslední bublinu POUZE stejné barvy
+            const sameColorNodes = nodes.filter(n => n.color === color);
+            const parent = sameColorNodes.length > 0 ? sameColorNodes[sameColorNodes.length - 1] : null;
 
             nodes.push({ el, color, parent });
             setTimeout(() => el.focus(), 10);
@@ -186,42 +180,35 @@
             ctx.lineWidth = 3 / scale;
 
             nodes.forEach(node => {
+                // Kreslíme čáru JEN když má uzel rodiče (tzn. je to aspoň druhá bublina té barvy)
                 if (node.parent) {
                     const p = node.parent.el;
                     const c = node.el;
-                    
                     const x1 = p.offsetLeft + p.offsetWidth / 2 + 5000;
                     const y1 = p.offsetTop + p.offsetHeight / 2 + 5000;
                     const x2 = c.offsetLeft + c.offsetWidth / 2 + 5000;
                     const y2 = c.offsetTop + c.offsetHeight / 2 + 5000;
-
                     ctx.strokeStyle = node.color;
-                    ctx.beginPath();
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                    ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
                 }
             });
         }
 
         function saveToLocalStorage() {
             const data = nodes.map(n => ({ 
-                x: n.el.style.left, 
-                y: n.el.style.top, 
-                text: n.el.innerText, 
-                color: n.color,
-                // Uložíme index rodiče pro obnovení vazeb
+                x: n.el.style.left, y: n.el.style.top, text: n.el.innerText, color: n.color,
                 parentIdx: nodes.indexOf(n.parent) 
             }));
-            localStorage.setItem('myGroupMap', JSON.stringify(data));
+            localStorage.setItem('myIndependentMap', JSON.stringify(data));
         }
 
         function exportToFile() {
-            const data = JSON.parse(localStorage.getItem('myGroupMap'));
-            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+            saveToLocalStorage();
+            const data = localStorage.getItem('myIndependentMap');
+            const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = 'barevne-vetve.json'; a.click();
+            a.href = url; a.download = 'mapa.json'; a.click();
         }
 
         function importFromFile(event) {
@@ -235,26 +222,17 @@
         function loadFromData(data) {
             nodes.forEach(n => n.el.remove());
             nodes = [];
-            
-            // První průchod - vytvoření bublin
             data.forEach(d => {
                 const el = createBubbleElement(parseInt(d.x), parseInt(d.y), d.text, d.color);
                 nodes.push({ el, color: d.color, parent: null });
             });
-
-            // Druhý průchod - obnova vazeb
-            data.forEach((d, i) => {
-                if (d.parentIdx !== -1) {
-                    nodes[i].parent = nodes[d.parentIdx];
-                }
-            });
-
+            data.forEach((d, i) => { if (d.parentIdx !== -1) nodes[i].parent = nodes[d.parentIdx]; });
             drawLines();
             saveToLocalStorage();
         }
 
         window.onload = () => {
-            const saved = localStorage.getItem('myGroupMap');
+            const saved = localStorage.getItem('myIndependentMap');
             if (saved) loadFromData(JSON.parse(saved));
             updateWorldTransform();
         };
