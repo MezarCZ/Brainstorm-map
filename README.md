@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Brainstorming App - Final Fix</title>
+    <title>Brainstorming Pro - Export Edition</title>
     <style>
         body { 
             margin: 0; padding: 0; overflow: hidden; 
@@ -22,7 +22,7 @@
         .bubble:focus { border-color: white; box-shadow: 0 0 15px rgba(255,255,255,0.3); cursor: text; }
 
         .controls-left { position: fixed; top: 20px; left: 20px; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
-        .controls-right { position: fixed; top: 20px; right: 20px; z-index: 100; display: flex; gap: 10px; }
+        .controls-right { position: fixed; top: 20px; right: 20px; z-index: 100; display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 
         .color-picker { display: flex; gap: 5px; background: rgba(255,255,255,0.1); padding: 5px; border-radius: 8px; }
         .color-dot { width: 25px; height: 25px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
@@ -34,6 +34,7 @@
         }
         button:hover { background: #0056b3; }
         .btn-save { background: #28a745; }
+        .btn-img { background: #6f42c1; } /* Fialové pro export obrázku */
 
         .hint { position: fixed; bottom: 20px; left: 20px; color: #888; font-size: 0.85em; background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 4px; }
     </style>
@@ -53,6 +54,7 @@
     </div>
 
     <div class="controls-right">
+        <button class="btn-img" id="imgBtn" onclick="exportToImage()">...</button>
         <button class="btn-save" id="saveBtn" onclick="exportToFile()">...</button>
         <button id="loadBtn" onclick="document.getElementById('fileInput').click()">...</button>
         <input type="file" id="fileInput" style="display:none" onchange="importFromFile(event)">
@@ -67,11 +69,12 @@
     </div>
 
     <script>
-        // Oprava textu pres Unicode - uz zadne otazniky!
+        // Unicode texty pro bezpecny GitHub
         document.getElementById('addBtn').textContent = "Nov\u00E1 my\u0161lenka";
+        document.getElementById('imgBtn').textContent = "Ulo\u017Eit jako obr\u00E1zek";
         document.getElementById('saveBtn').textContent = "Ulo\u017Eit projekt";
         document.getElementById('loadBtn').textContent = "Otev\u0159\u00EDt projekt";
-        document.getElementById('hint-box').textContent = "Barvy tvo\u0159\u00ED samostatn\u00E9 v\u011Btve. Prav\u00E9 tla\u010D\u00EDtko ma\u017Ee.";
+        document.getElementById('hint-box').textContent = "Prav\u00E9 tla\u010D\u00EDtko ma\u017Ee. Barvy tvo\u0159\u00ED samostatn\u00E9 v\u011Btve.";
 
         const viewport = document.getElementById('viewport');
         const world = document.getElementById('world');
@@ -162,7 +165,6 @@
             const color = currentColor;
             const el = createBubbleElement(x, y, '', color);
             
-            // Samostatne vetve podle barev
             const sameColorNodes = nodes.filter(n => n.color === color);
             const parent = sameColorNodes.length > 0 ? sameColorNodes[sameColorNodes.length - 1] : null;
 
@@ -192,21 +194,86 @@
             });
         }
 
+        // FUNKCE PRO EXPORT OBRÁZKU
+        function exportToImage() {
+            if (nodes.length === 0) return;
+            
+            // 1. Najdeme hranice všech bublin
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            nodes.forEach(n => {
+                const x = parseInt(n.el.style.left);
+                const y = parseInt(n.el.style.top);
+                minX = Math.min(minX, x); minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x + n.el.offsetWidth);
+                maxY = Math.max(maxY, y + n.el.offsetHeight);
+            });
+
+            // Přidáme okraje
+            const padding = 50;
+            const exportCanvas = document.createElement('canvas');
+            const eCtx = exportCanvas.getContext('2d');
+            exportCanvas.width = (maxX - minX) + padding * 2;
+            exportCanvas.height = (maxY - minY) + padding * 2;
+
+            // Pozadí
+            eCtx.fillStyle = "#121212";
+            eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+            // Kreslení čar na exportní plátno
+            eCtx.lineWidth = 3;
+            nodes.forEach(node => {
+                if (node.parent) {
+                    const p = node.parent.el;
+                    const c = node.el;
+                    eCtx.strokeStyle = node.color;
+                    eCtx.beginPath();
+                    eCtx.moveTo(parseInt(p.style.left) - minX + p.offsetWidth / 2 + padding, parseInt(p.style.top) - minY + p.offsetHeight / 2 + padding);
+                    eCtx.lineTo(parseInt(c.style.left) - minX + c.offsetWidth / 2 + padding, parseInt(c.style.top) - minY + c.offsetHeight / 2 + padding);
+                    eCtx.stroke();
+                }
+            });
+
+            // Kreslení bublin (jednoduché obdélníky s textem)
+            nodes.forEach(node => {
+                const x = parseInt(node.el.style.left) - minX + padding;
+                const y = parseInt(node.el.style.top) - minY + padding;
+                const w = node.el.offsetWidth;
+                const h = node.el.offsetHeight;
+
+                eCtx.fillStyle = node.color;
+                // Zakulacený obdélník (zjednodušeně)
+                eCtx.beginPath();
+                eCtx.roundRect(x, y, w, h, 12);
+                eCtx.fill();
+
+                eCtx.fillStyle = "white";
+                eCtx.font = "16px sans-serif";
+                eCtx.textAlign = "center";
+                eCtx.textBaseline = "middle";
+                eCtx.fillText(node.el.innerText, x + w / 2, y + h / 2);
+            });
+
+            const link = document.createElement('a');
+            link.download = 'moje-mapa.png';
+            link.href = exportCanvas.toDataURL();
+            link.click();
+        }
+
         function saveToLocalStorage() {
             const data = nodes.map(n => ({ 
                 x: n.el.style.left, y: n.el.style.top, text: n.el.innerText, color: n.color,
                 parentIdx: nodes.indexOf(n.parent) 
             }));
-            localStorage.setItem('myGroupMapVFinal', JSON.stringify(data));
+            localStorage.setItem('myProMapV1', JSON.stringify(data));
         }
 
         function exportToFile() {
             saveToLocalStorage();
-            const data = localStorage.getItem('myGroupMapVFinal');
+            const data = localStorage.getItem('myProMapV1');
             const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = 'mapa.json'; a.click();
+            a.href = url; a.download = 'projekt.json'; a.click();
         }
 
         function importFromFile(event) {
@@ -224,13 +291,13 @@
                 const el = createBubbleElement(parseInt(d.x), parseInt(d.y), d.text, d.color);
                 nodes.push({ el, color: d.color, parent: null });
             });
-            data.forEach((d, i) => { if (d.parentIdx !== -1) nodes[i].parent = nodes[d.parentIdx]; });
+            data.forEach((d, i) => { if (d.parentIdx !== -1 && nodes[d.parentIdx]) nodes[i].parent = nodes[d.parentIdx]; });
             drawLines();
             saveToLocalStorage();
         }
 
         window.onload = () => {
-            const saved = localStorage.getItem('myGroupMapVFinal');
+            const saved = localStorage.getItem('myProMapV1');
             if (saved) loadFromData(JSON.parse(saved));
             updateWorldTransform();
         };
