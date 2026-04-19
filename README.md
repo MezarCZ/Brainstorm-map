@@ -168,4 +168,96 @@
                 if (sameColorNodes.length > 0) {
                     parent = sameColorNodes[sameColorNodes.length - 1];
                 } else {
-                    // Pokud je to první bublina téhle barvy, připoj
+                    // Pokud je to první bublina téhle barvy, připoj ji k úplně první bublině (středu)
+                    parent = nodes[0];
+                }
+            }
+
+            nodes.push({ el, color, parent });
+            setTimeout(() => el.focus(), 10);
+            drawLines();
+            saveToLocalStorage();
+        }
+
+        function drawLines() {
+            canvas.width = 10000; canvas.height = 10000;
+            canvas.style.left = "-5000px"; canvas.style.top = "-5000px";
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = 3 / scale;
+
+            nodes.forEach(node => {
+                if (node.parent) {
+                    const p = node.parent.el;
+                    const c = node.el;
+                    
+                    const x1 = p.offsetLeft + p.offsetWidth / 2 + 5000;
+                    const y1 = p.offsetTop + p.offsetHeight / 2 + 5000;
+                    const x2 = c.offsetLeft + c.offsetWidth / 2 + 5000;
+                    const y2 = c.offsetTop + c.offsetHeight / 2 + 5000;
+
+                    ctx.strokeStyle = node.color;
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+                }
+            });
+        }
+
+        function saveToLocalStorage() {
+            const data = nodes.map(n => ({ 
+                x: n.el.style.left, 
+                y: n.el.style.top, 
+                text: n.el.innerText, 
+                color: n.color,
+                // Uložíme index rodiče pro obnovení vazeb
+                parentIdx: nodes.indexOf(n.parent) 
+            }));
+            localStorage.setItem('myGroupMap', JSON.stringify(data));
+        }
+
+        function exportToFile() {
+            const data = JSON.parse(localStorage.getItem('myGroupMap'));
+            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'barevne-vetve.json'; a.click();
+        }
+
+        function importFromFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => loadFromData(JSON.parse(e.target.result));
+            reader.readAsText(file);
+        }
+
+        function loadFromData(data) {
+            nodes.forEach(n => n.el.remove());
+            nodes = [];
+            
+            // První průchod - vytvoření bublin
+            data.forEach(d => {
+                const el = createBubbleElement(parseInt(d.x), parseInt(d.y), d.text, d.color);
+                nodes.push({ el, color: d.color, parent: null });
+            });
+
+            // Druhý průchod - obnova vazeb
+            data.forEach((d, i) => {
+                if (d.parentIdx !== -1) {
+                    nodes[i].parent = nodes[d.parentIdx];
+                }
+            });
+
+            drawLines();
+            saveToLocalStorage();
+        }
+
+        window.onload = () => {
+            const saved = localStorage.getItem('myGroupMap');
+            if (saved) loadFromData(JSON.parse(saved));
+            updateWorldTransform();
+        };
+    </script>
+</body>
+</html>
