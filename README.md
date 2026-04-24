@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Brainstorming Neon - Safe Text Edition</title>
+    <title>Brainstorming Neon - Czech Fix</title>
     <style>
         body { 
             margin: 0; padding: 0; overflow: hidden; 
@@ -24,12 +24,11 @@
             font-weight: bold; transition: box-shadow 0.3s, border-color 0.3s;
         }
 
-        /* Samostatná zóna pro text */
         .bubble-content {
             width: 100%; height: 100%;
             display: flex; align-items: center; justify-content: center;
             padding: 10px; box-sizing: border-box;
-            outline: none; pointer-events: none; /* Zamčeno pro běžný klik */
+            outline: none; pointer-events: none;
         }
         
         .bubble[data-editing="true"] { border-color: white !important; box-shadow: 0 0 25px rgba(255,255,255,0.5); }
@@ -59,6 +58,7 @@
         button { padding: 12px 18px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; }
         .btn-add { background: #1a73e8; }
         .btn-save { background: #1e8e3e; }
+        .btn-load { background: #007bff; }
 
         .hint { position: fixed; bottom: 20px; left: 20px; color: #888; font-size: 0.85em; background: rgba(0,0,0,0.7); padding: 10px 15px; border-radius: 8px; }
     </style>
@@ -66,17 +66,17 @@
 <body>
 
     <div class="controls-left">
-        <button class="btn-add" onclick="addNode()">Nová myšlenka</button>
+        <button class="btn-add" id="addBtn">Add</button>
         <div id="picker-container" style="display: flex; gap: 8px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 12px;"></div>
     </div>
 
     <div class="controls-right">
-        <button class="btn-save" onclick="exportToFile()">Uložit</button>
-        <button style="background: #007bff;" onclick="document.getElementById('fileInput').click()">Otevřít</button>
+        <button class="btn-save" id="saveBtn">Save</button>
+        <button id="loadBtn" style="background: #007bff;">Open</button>
         <input type="file" id="fileInput" style="display:none" onchange="importFromFile(event)">
     </div>
 
-    <div class="hint">Plocha: Tah pro posun | Bublina: Tah pro pohyb, Dvojklik pro psaní</div>
+    <div id="hintBox" class="hint"></div>
 
     <div id="viewport">
         <div id="world">
@@ -85,6 +85,14 @@
     </div>
 
     <script>
+        // Funkce pro bezpečné vložení češtiny bez otazníků
+        const cz = (s) => decodeURIComponent(escape(s));
+        
+        document.getElementById('addBtn').textContent = cz("Nov\xE1 my\u0161lenka");
+        document.getElementById('saveBtn').textContent = cz("Ulo\u017Eit");
+        document.getElementById('loadBtn').textContent = cz("Otev\u0159\u00EDt");
+        document.getElementById('hintBox').textContent = cz("Plocha: Tah pro posun | Bublina: Tah pro pohyb, Dvojklik pro psan\xED");
+
         const viewport = document.getElementById('viewport');
         const world = document.getElementById('world');
         const canvas = document.getElementById('line-canvas');
@@ -127,14 +135,9 @@
             requestAnimationFrame(applyPhysics);
         }
 
-        viewport.onmousedown = (e) => { 
-            if (e.target === viewport) { isDraggingView = true; startX = e.clientX - posX; startY = e.clientY - posY; } 
-        };
+        viewport.onmousedown = (e) => { if (e.target === viewport) { isDraggingView = true; startX = e.clientX - posX; startY = e.clientY - posY; } };
         window.onmousemove = (e) => {
-            if (isDraggingView) { 
-                posX = e.clientX - startX; posY = e.clientY - startY; 
-                world.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`; 
-            }
+            if (isDraggingView) { posX = e.clientX - startX; posY = e.clientY - startY; world.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`; }
             if (drawingLineFrom) tempMousePos = { x: (e.clientX - posX) / scale, y: (e.clientY - posY) / scale };
         };
         window.onmouseup = () => { isDraggingView = false; drawingLineFrom = null; tempMousePos = null; };
@@ -257,10 +260,10 @@
 
         function saveToLocalStorage() {
             const data = nodes.map(n => ({ x: n.x, y: n.y, text: n.el.querySelector('.bubble-content').innerText, color: n.color, autoParentIdx: nodes.indexOf(n.autoParent), manualParentIndices: n.manualParents.map(p => nodes.indexOf(p)) }));
-            localStorage.setItem('myNeonFinalClean', JSON.stringify(data));
+            localStorage.setItem('myNeonCzechFix', JSON.stringify(data));
         }
 
-        function exportToFile() { saveToLocalStorage(); const data = localStorage.getItem('myNeonFinalClean'); const blob = new Blob([data], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'projekt.json'; a.click(); }
+        function exportToFile() { saveToLocalStorage(); const data = localStorage.getItem('myNeonCzechFix'); const blob = new Blob([data], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'projekt.json'; a.click(); }
         function importFromFile(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => loadFromData(JSON.parse(e.target.result)); reader.readAsText(file); }
 
         function loadFromData(data) {
@@ -269,7 +272,7 @@
             data.forEach((d, i) => { if (d.autoParentIdx !== -1) nodes[i].autoParent = nodes[d.autoParentIdx]; d.manualParentIndices.forEach(idx => nodes[i].manualParents.push(nodes[idx])); });
         }
 
-        window.onload = () => { const saved = localStorage.getItem('myNeonFinalClean'); if (saved) loadFromData(JSON.parse(saved)); applyPhysics(); };
+        window.onload = () => { const saved = localStorage.getItem('myNeonCzechFix'); if (saved) loadFromData(JSON.parse(saved)); applyPhysics(); };
     </script>
 </body>
 </html>
