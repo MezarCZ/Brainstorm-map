@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Brainstorming Neon - Final Stable</title>
+    <title>Brainstorming Neon - Safe Text Edition</title>
     <style>
         body { 
             margin: 0; padding: 0; overflow: hidden; 
@@ -15,27 +15,33 @@
 
         .bubble { 
             min-width: 140px; min-height: 50px;
-            padding: 10px; color: #ffffff;
+            color: #ffffff;
             border: 2px solid rgba(255,255,255,0.1); border-radius: 16px; 
             position: absolute; cursor: move; 
             box-shadow: 0 0 15px rgba(0,0,0,0.5); z-index: 2; outline: none;
             display: flex; align-items: center; justify-content: center;
-            text-align: center; backdrop-filter: blur(4px);
+            backdrop-filter: blur(4px);
             font-weight: bold; transition: box-shadow 0.3s, border-color 0.3s;
         }
 
-        .bubble[contenteditable="true"] { 
-            cursor: text; user-select: text; 
-            border-color: white !important; 
-            box-shadow: 0 0 25px rgba(255,255,255,0.5); 
+        /* Samostatná zóna pro text */
+        .bubble-content {
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            padding: 10px; box-sizing: border-box;
+            outline: none; pointer-events: none; /* Zamčeno pro běžný klik */
+        }
+        
+        .bubble[data-editing="true"] { border-color: white !important; box-shadow: 0 0 25px rgba(255,255,255,0.5); }
+        .bubble[data-editing="true"] .bubble-content { 
+            pointer-events: auto; cursor: text; user-select: text;
         }
 
-        /* Mini Paleta */
         .cell-picker {
             position: absolute; top: -45px; left: 50%; transform: translateX(-50%);
             display: none; gap: 8px; background: rgba(0,0,0,0.9); 
             padding: 6px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);
-            z-index: 20;
+            z-index: 20; pointer-events: auto;
         }
         .bubble:hover .cell-picker, .bubble:focus-within .cell-picker { display: flex; }
         .cell-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.3); }
@@ -43,7 +49,7 @@
         .connector {
             width: 14px; height: 14px; background: white; border-radius: 50%;
             position: absolute; bottom: -7px; left: calc(50% - 7px); cursor: crosshair;
-            opacity: 0; transition: opacity 0.2s; z-index: 10;
+            opacity: 0; transition: opacity 0.2s; z-index: 10; pointer-events: auto;
         }
         .bubble:hover .connector { opacity: 1; }
 
@@ -53,8 +59,6 @@
         button { padding: 12px 18px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; }
         .btn-add { background: #1a73e8; }
         .btn-save { background: #1e8e3e; }
-        .btn-load { background: #007bff; }
-        .btn-img { background: #8e24aa; }
 
         .hint { position: fixed; bottom: 20px; left: 20px; color: #888; font-size: 0.85em; background: rgba(0,0,0,0.7); padding: 10px 15px; border-radius: 8px; }
     </style>
@@ -62,18 +66,17 @@
 <body>
 
     <div class="controls-left">
-        <button class="btn-add" id="addBtn" onclick="addNode()">...</button>
+        <button class="btn-add" onclick="addNode()">Nová myšlenka</button>
         <div id="picker-container" style="display: flex; gap: 8px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 12px;"></div>
     </div>
 
     <div class="controls-right">
-        <button class="btn-img" onclick="exportToImage()">PNG</button>
-        <button class="btn-save" id="saveBtn" onclick="exportToFile()">Ulozit</button>
-        <button class="btn-load" id="loadBtn" onclick="document.getElementById('fileInput').click()">Otevrit</button>
+        <button class="btn-save" onclick="exportToFile()">Uložit</button>
+        <button style="background: #007bff;" onclick="document.getElementById('fileInput').click()">Otevřít</button>
         <input type="file" id="fileInput" style="display:none" onchange="importFromFile(event)">
     </div>
 
-    <div id="hint-box" class="hint">...</div>
+    <div class="hint">Plocha: Tah pro posun | Bublina: Tah pro pohyb, Dvojklik pro psaní</div>
 
     <div id="viewport">
         <div id="world">
@@ -82,17 +85,13 @@
     </div>
 
     <script>
-        const txt = (id, s) => { if(document.getElementById(id)) document.getElementById(id).textContent = s; };
-        txt('addBtn', "Nov\u00E1 my\u0161lenka");
-        txt('hint-box', "Pozad\u00ED: Posun plochy | Bublina: Klik a t\u00E1hni | Dvojklik: Psan\u00ED");
-
         const viewport = document.getElementById('viewport');
         const world = document.getElementById('world');
         const canvas = document.getElementById('line-canvas');
         const ctx = canvas.getContext('2d');
         let nodes = [];
         let currentColor = '#ff4757';
-        let scale = 1, posX = 0, posY = 0;
+        let posX = 0, posY = 0, scale = 1;
         let isDraggingView = false, startX, startY, drawingLineFrom = null, tempMousePos = null;
 
         const PALETTE = ['#2a2a2a', '#ff4757', '#2ed573', '#1e90ff', '#ffa502'];
@@ -129,16 +128,11 @@
         }
 
         viewport.onmousedown = (e) => { 
-            if (e.target === viewport) { 
-                isDraggingView = true; 
-                startX = e.clientX - posX; 
-                startY = e.clientY - posY; 
-            } 
+            if (e.target === viewport) { isDraggingView = true; startX = e.clientX - posX; startY = e.clientY - posY; } 
         };
         window.onmousemove = (e) => {
             if (isDraggingView) { 
-                posX = e.clientX - startX; 
-                posY = e.clientY - startY; 
+                posX = e.clientX - startX; posY = e.clientY - startY; 
                 world.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`; 
             }
             if (drawingLineFrom) tempMousePos = { x: (e.clientX - posX) / scale, y: (e.clientY - posY) / scale };
@@ -148,9 +142,12 @@
         function createBubbleElement(x, y, color) {
             const el = document.createElement('div');
             el.className = 'bubble';
-            el.contentEditable = "false";
-            el.innerText = ""; // Prázdná bublina
             updateBubbleStyle(el, color);
+
+            const content = document.createElement('div');
+            content.className = 'bubble-content';
+            content.contentEditable = "false";
+            el.appendChild(content);
 
             const picker = document.createElement('div');
             picker.className = 'cell-picker';
@@ -177,34 +174,30 @@
 
             el.ondblclick = (e) => {
                 e.stopPropagation();
-                el.contentEditable = "true";
-                el.focus();
+                el.setAttribute('data-editing', 'true');
+                content.contentEditable = "true";
+                content.focus();
             };
 
-            el.onblur = () => {
-                el.contentEditable = "false";
+            content.onblur = () => {
+                el.setAttribute('data-editing', 'false');
+                content.contentEditable = "false";
                 saveToLocalStorage();
             };
 
             el.onmousedown = (e) => {
-                if (el.contentEditable === "true") return;
+                if (el.getAttribute('data-editing') === "true") return;
                 if (e.button === 2) { deleteNode(el); return; }
                 e.stopPropagation();
-                
                 let bStartX = e.clientX / scale - x;
                 let bStartY = e.clientY / scale - y;
-                
                 const move = (ev) => { 
                     const node = nodes.find(n => n.el === el); 
                     node.x = (ev.clientX / scale - bStartX); 
                     node.y = (ev.clientY / scale - bStartY); 
                 };
-                
                 document.addEventListener('mousemove', move);
-                document.onmouseup = () => {
-                    document.removeEventListener('mousemove', move);
-                    saveToLocalStorage();
-                };
+                document.onmouseup = () => document.removeEventListener('mousemove', move);
             };
 
             el.onmouseup = (e) => {
@@ -246,45 +239,37 @@
             canvas.width = 10000; canvas.height = 10000;
             canvas.style.left = "-5000px"; canvas.style.top = "-5000px";
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.lineWidth = 4 / scale;
-
+            ctx.lineWidth = 4;
             nodes.forEach(node => {
                 if (node.autoParent) drawCurve(node.autoParent.x + node.autoParent.el.offsetWidth/2 + 5000, node.autoParent.y + node.autoParent.el.offsetHeight/2 + 5000, node.x + node.el.offsetWidth/2 + 5000, node.y + node.el.offsetHeight/2 + 5000, node.autoParent.color, node.color);
                 node.manualParents.forEach(p => drawCurve(p.x + p.el.offsetWidth/2 + 5000, p.y + p.el.offsetHeight/2 + 5000, node.x + node.el.offsetWidth/2 + 5000, node.y + node.el.offsetHeight/2 + 5000, p.color, node.color));
             });
-
             if (drawingLineFrom && tempMousePos) drawCurve(drawingLineFrom.x + drawingLineFrom.el.offsetWidth/2 + 5000, drawingLineFrom.y + drawingLineFrom.el.offsetHeight/2 + 5000, tempMousePos.x + 5000, tempMousePos.y + 5000, drawingLineFrom.color, "#ffffff");
         }
 
         function drawCurve(x1, y1, x2, y2, c1, c2) {
             const grad = ctx.createLinearGradient(x1, y1, x2, y2);
             grad.addColorStop(0, c1); grad.addColorStop(1, c2);
-            ctx.strokeStyle = grad; ctx.shadowBlur = 15 / scale; ctx.shadowColor = c1;
-            ctx.beginPath(); ctx.moveTo(x1, y1);
-            const cp1x = x1 + (x2 - x1) * 0.5;
-            ctx.bezierCurveTo(cp1x, y1, cp1x, y2, x2, y2);
-            ctx.stroke(); ctx.shadowBlur = 0;
+            ctx.strokeStyle = grad; ctx.beginPath(); ctx.moveTo(x1, y1);
+            ctx.bezierCurveTo(x1 + (x2 - x1) * 0.5, y1, x1 + (x2 - x1) * 0.5, y2, x2, y2);
+            ctx.stroke();
         }
 
         function saveToLocalStorage() {
-            const data = nodes.map(n => ({ x: n.x, y: n.y, text: n.el.innerText, color: n.color, autoParentIdx: nodes.indexOf(n.autoParent), manualParentIndices: n.manualParents.map(p => nodes.indexOf(p)) }));
-            localStorage.setItem('myNeonFinalFixed', JSON.stringify(data));
+            const data = nodes.map(n => ({ x: n.x, y: n.y, text: n.el.querySelector('.bubble-content').innerText, color: n.color, autoParentIdx: nodes.indexOf(n.autoParent), manualParentIndices: n.manualParents.map(p => nodes.indexOf(p)) }));
+            localStorage.setItem('myNeonFinalClean', JSON.stringify(data));
         }
 
-        function exportToFile() { saveToLocalStorage(); const data = localStorage.getItem('myNeonFinalFixed'); const blob = new Blob([data], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'projekt.json'; a.click(); }
+        function exportToFile() { saveToLocalStorage(); const data = localStorage.getItem('myNeonFinalClean'); const blob = new Blob([data], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'projekt.json'; a.click(); }
         function importFromFile(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => loadFromData(JSON.parse(e.target.result)); reader.readAsText(file); }
 
         function loadFromData(data) {
             nodes.forEach(n => n.el.remove()); nodes = [];
-            data.forEach(d => { const el = createBubbleElement(d.x, d.y, d.color); el.innerText = d.text; nodes.push({ el, x: d.x, y: d.y, color: d.color, autoParent: null, manualParents: [] }); });
+            data.forEach(d => { const el = createBubbleElement(d.x, d.y, d.color); el.querySelector('.bubble-content').innerText = d.text; nodes.push({ el, x: d.x, y: d.y, color: d.color, autoParent: null, manualParents: [] }); });
             data.forEach((d, i) => { if (d.autoParentIdx !== -1) nodes[i].autoParent = nodes[d.autoParentIdx]; d.manualParentIndices.forEach(idx => nodes[i].manualParents.push(nodes[idx])); });
         }
 
-        function exportToImage() {
-            // ... (logika PNG exportu)
-        }
-
-        window.onload = () => { const saved = localStorage.getItem('myNeonFinalFixed'); if (saved) loadFromData(JSON.parse(saved)); applyPhysics(); };
+        window.onload = () => { const saved = localStorage.getItem('myNeonFinalClean'); if (saved) loadFromData(JSON.parse(saved)); applyPhysics(); };
     </script>
 </body>
 </html>
