@@ -127,4 +127,146 @@
             el.classList.add('active');
         }
 
-        viewport.onmousedown =
+        viewport.onmousedown = (e) => { if (e.target === viewport) { isDraggingView = true; startX = e.clientX - posX; startY = e.clientY - posY; } };
+        window.onmousemove = (e) => {
+            if (isDraggingView) { posX = e.clientX - startX; posY = e.clientY - startY; world.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`; }
+            if (drawingLineFrom) tempMousePos = { x: (e.clientX - posX) / scale, y: (e.clientY - posY) / scale };
+        };
+        window.onmouseup = () => { isDraggingView = false; drawingLineFrom = null; tempMousePos = null; };
+
+        function createBubbleElement(x, y, color) {
+            const el = document.createElement('div');
+            el.className = 'bubble';
+            updateBubbleStyle(el, color);
+            el.contentEditable = "true";
+
+            const picker = document.createElement('div');
+            picker.className = 'cell-picker';
+            picker.contentEditable = "false";
+            PALETTE.forEach(c => {
+                const dot = document.createElement('div');
+                dot.className = 'cell-dot';
+                dot.style.background = c;
+                dot.onmousedown = (e) => {
+                    e.stopPropagation(); e.preventDefault();
+                    const node = nodes.find(n => n.el === el);
+                    node.color = c;
+                    updateBubbleStyle(el, c);
+                    saveToLocalStorage();
+                };
+                picker.appendChild(dot);
+            });
+
+            const conn = document.createElement('div');
+            conn.className = 'connector';
+            conn.contentEditable = "false";
+            conn.onmousedown = (e) => { e.stopPropagation(); e.preventDefault(); drawingLineFrom = nodes.find(n => n.el === el); };
+
+            el.appendChild(picker);
+            el.appendChild(conn);
+
+            el.onmouseup = (e) => {
+                if (drawingLineFrom && drawingLineFrom.el !== el) {
+                    const target = nodes.find(n => n.el === el);
+                    if (!target.manualParents.includes(drawingLineFrom)) { target.manualParents.push(drawingLineFrom); saveToLocalStorage(); }
+                }
+            };
+
+            el.onmousedown = (e) => {
+                if (e.target !== el) return; // Nechceme hýbat, když klikáme na paletu nebo tečku
+                if (e.button === 2) { deleteNode(el); return; }
+                
+                e.stopPropagation();
+                let bStartX = e.clientX / scale - x;
+                let bStartY = e.clientY / scale - y;
+                
+                const move = (ev) => { 
+                    const node = nodes.find(n => n.el === el); 
+                    node.x = (ev.clientX / scale - bStartX); 
+                    node.y = (ev.clientY / scale - bStartY); 
+                };
+                
+                document.addEventListener('mousemove', move);
+                document.onmouseup = () => {
+                    document.removeEventListener('mousemove', move);
+                    saveToLocalStorage();
+                };
+            };
+            
+            el.oncontextmenu = (e) => e.preventDefault();
+            el.oninput = () => saveToLocalStorage();
+
+            world.appendChild(el);
+            return el;
+        }
+
+        function updateBubbleStyle(el, color) {
+            el.style.background = color + "CC";
+            el.style.borderColor = color;
+            el.style.boxShadow = `0 0 20px ${color}66`;
+        }
+
+        function deleteNode(el) {
+            el.remove();
+            nodes = nodes.filter(n => n.el !== el);
+            nodes.forEach(n => n.manualParents = n.manualParents.filter(p => p.el !== el));
+            saveToLocalStorage();
+        }
+
+        function addNode() {
+            const x = (window.innerWidth / 2 - posX) / scale - 70;
+            const y = (window.innerHeight / 2 - posY) / scale - 25;
+            const el = createBubbleElement(x, y, currentColor);
+            const sameColor = nodes.filter(n => n.color === currentColor);
+            const autoParent = sameColor.length > 0 ? sameColor[sameColor.length - 1] : null;
+            nodes.push({ el, x, y, color: currentColor, autoParent, manualParents: [] });
+            setTimeout(() => el.focus(), 10);
+            saveToLocalStorage();
+        }
+
+        function drawLines() {
+            canvas.width = 10000; canvas.height = 10000;
+            canvas.style.left = "-5000px"; canvas.style.top = "-5000px";
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = 4 / scale;
+
+            nodes.forEach(node => {
+                if (node.autoParent) drawCurve(node.autoParent.x + node.autoParent.el.offsetWidth/2 + 5000, node.autoParent.y + node.autoParent.el.offsetHeight/2 + 5000, node.x + node.el.offsetWidth/2 + 5000, node.y + node.el.offsetHeight/2 + 5000, node.autoParent.color, node.color);
+                node.manualParents.forEach(p => drawCurve(p.x + p.el.offsetWidth/2 + 5000, p.y + p.el.offsetHeight/2 + 5000, node.x + node.el.offsetWidth/2 + 5000, node.y + node.el.offsetHeight/2 + 5000, p.color, node.color));
+            });
+
+            if (drawingLineFrom && tempMousePos) drawCurve(drawingLineFrom.x + drawingLineFrom.el.offsetWidth/2 + 5000, drawingLineFrom.y + drawingLineFrom.el.offsetHeight/2 + 5000, tempMousePos.x + 5000, tempMousePos.y + 5000, drawingLineFrom.color, "#ffffff");
+        }
+
+        function drawCurve(x1, y1, x2, y2, c1, c2) {
+            const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+            grad.addColorStop(0, c1); grad.addColorStop(1, c2);
+            ctx.strokeStyle = grad; ctx.shadowBlur = 15 / scale; ctx.shadowColor = c1;
+            ctx.beginPath(); ctx.moveTo(x1, y1);
+            const cp1x = x1 + (x2 - x1) * 0.5;
+            ctx.bezierCurveTo(cp1x, y1, cp1x, y2, x2, y2);
+            ctx.stroke(); ctx.shadowBlur = 0;
+        }
+
+        function saveToLocalStorage() {
+            const data = nodes.map(n => ({ x: n.x, y: n.y, text: n.el.innerText, color: n.color, autoParentIdx: nodes.indexOf(n.autoParent), manualParentIndices: n.manualParents.map(p => nodes.indexOf(p)) }));
+            localStorage.setItem('myNeonHybridStable', JSON.stringify(data));
+        }
+
+        function exportToFile() { saveToLocalStorage(); const data = localStorage.getItem('myNeonHybridStable'); const blob = new Blob([data], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'projekt.json'; a.click(); }
+        function importFromFile(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => loadFromData(JSON.parse(e.target.result)); reader.readAsText(file); }
+
+        function loadFromData(data) {
+            nodes.forEach(n => n.el.remove()); nodes = [];
+            data.forEach(d => { const el = createBubbleElement(d.x, d.y, d.color); el.innerText = d.text; nodes.push({ el, x: d.x, y: d.y, color: d.color, autoParent: null, manualParents: [] }); });
+            data.forEach((d, i) => { if (d.autoParentIdx !== -1) nodes[i].autoParent = nodes[d.autoParentIdx]; d.manualParentIndices.forEach(idx => nodes[i].manualParents.push(nodes[idx])); });
+        }
+
+        function exportToImage() {
+            // ... (logika PNG exportu)
+        }
+
+        window.onload = () => { const saved = localStorage.getItem('myNeonHybridStable'); if (saved) loadFromData(JSON.parse(saved)); applyPhysics(); };
+    </script>
+</body>
+</html>
