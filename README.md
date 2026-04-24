@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Brainstorming Neon - Solid Edit</title>
+    <title>Brainstorming Neon - Final Stable</title>
     <style>
         body { 
             margin: 0; padding: 0; overflow: hidden; 
@@ -23,14 +23,6 @@
             text-align: center; backdrop-filter: blur(4px);
             font-weight: bold; transition: box-shadow 0.3s, border-color 0.3s;
         }
-        
-        /* Zajištění, že text bude vždy uprostřed */
-        .bubble-text {
-            width: 100%; pointer-events: none; word-wrap: break-word;
-        }
-        .bubble[contenteditable="true"] .bubble-text {
-            pointer-events: auto;
-        }
 
         .bubble[contenteditable="true"] { 
             cursor: text; user-select: text; 
@@ -38,6 +30,7 @@
             box-shadow: 0 0 25px rgba(255,255,255,0.5); 
         }
 
+        /* Mini Paleta */
         .cell-picker {
             position: absolute; top: -45px; left: 50%; transform: translateX(-50%);
             display: none; gap: 8px; background: rgba(0,0,0,0.9); 
@@ -91,7 +84,7 @@
     <script>
         const txt = (id, s) => { if(document.getElementById(id)) document.getElementById(id).textContent = s; };
         txt('addBtn', "Nov\u00E1 my\u0161lenka");
-        txt('hint-box', "Dr\u017E a t\u00E1hni: Pohyb | Dvojklik: Psan\u00ED");
+        txt('hint-box', "Pozad\u00ED: Posun plochy | Bublina: Klik a t\u00E1hni | Dvojklik: Psan\u00ED");
 
         const viewport = document.getElementById('viewport');
         const world = document.getElementById('world');
@@ -135,9 +128,19 @@
             requestAnimationFrame(applyPhysics);
         }
 
-        viewport.onmousedown = (e) => { if (e.target === viewport) { isDraggingView = true; startX = e.clientX - posX; startY = e.clientY - posY; } };
+        viewport.onmousedown = (e) => { 
+            if (e.target === viewport) { 
+                isDraggingView = true; 
+                startX = e.clientX - posX; 
+                startY = e.clientY - posY; 
+            } 
+        };
         window.onmousemove = (e) => {
-            if (isDraggingView) { posX = e.clientX - startX; posY = e.clientY - startY; world.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`; }
+            if (isDraggingView) { 
+                posX = e.clientX - startX; 
+                posY = e.clientY - startY; 
+                world.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`; 
+            }
             if (drawingLineFrom) tempMousePos = { x: (e.clientX - posX) / scale, y: (e.clientY - posY) / scale };
         };
         window.onmouseup = () => { isDraggingView = false; drawingLineFrom = null; tempMousePos = null; };
@@ -146,12 +149,8 @@
             const el = document.createElement('div');
             el.className = 'bubble';
             el.contentEditable = "false";
+            el.innerText = ""; // Prázdná bublina
             updateBubbleStyle(el, color);
-
-            const textSpan = document.createElement('span');
-            textSpan.className = 'bubble-text';
-            textSpan.innerText = "N\u00E1pad...";
-            el.appendChild(textSpan);
 
             const picker = document.createElement('div');
             picker.className = 'cell-picker';
@@ -180,12 +179,6 @@
                 e.stopPropagation();
                 el.contentEditable = "true";
                 el.focus();
-                // Vybrat text po dvojkliku
-                const range = document.createRange();
-                range.selectNodeContents(el);
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
             };
 
             el.onblur = () => {
@@ -275,10 +268,10 @@
 
         function saveToLocalStorage() {
             const data = nodes.map(n => ({ x: n.x, y: n.y, text: n.el.innerText, color: n.color, autoParentIdx: nodes.indexOf(n.autoParent), manualParentIndices: n.manualParents.map(p => nodes.indexOf(p)) }));
-            localStorage.setItem('myNeonStableFinal', JSON.stringify(data));
+            localStorage.setItem('myNeonFinalFixed', JSON.stringify(data));
         }
 
-        function exportToFile() { saveToLocalStorage(); const data = localStorage.getItem('myNeonStableFinal'); const blob = new Blob([data], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'projekt.json'; a.click(); }
+        function exportToFile() { saveToLocalStorage(); const data = localStorage.getItem('myNeonFinalFixed'); const blob = new Blob([data], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'projekt.json'; a.click(); }
         function importFromFile(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => loadFromData(JSON.parse(e.target.result)); reader.readAsText(file); }
 
         function loadFromData(data) {
@@ -291,7 +284,7 @@
             // ... (logika PNG exportu)
         }
 
-        window.onload = () => { const saved = localStorage.getItem('myNeonStableFinal'); if (saved) loadFromData(JSON.parse(saved)); applyPhysics(); };
+        window.onload = () => { const saved = localStorage.getItem('myNeonFinalFixed'); if (saved) loadFromData(JSON.parse(saved)); applyPhysics(); };
     </script>
 </body>
 </html>
