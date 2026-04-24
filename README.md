@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Brainstorming Neon - Czech Fix</title>
+    <title>Brainstorming Neon - Ultimate Fixed</title>
     <style>
         body { 
             margin: 0; padding: 0; overflow: hidden; 
@@ -49,13 +49,15 @@
             width: 14px; height: 14px; background: white; border-radius: 50%;
             position: absolute; bottom: -7px; left: calc(50% - 7px); cursor: crosshair;
             opacity: 0; transition: opacity 0.2s; z-index: 10; pointer-events: auto;
+            box-shadow: 0 0 8px white;
         }
         .bubble:hover .connector { opacity: 1; }
 
         .controls-left { position: fixed; top: 20px; left: 20px; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
         .controls-right { position: fixed; top: 20px; right: 20px; z-index: 100; display: flex; gap: 10px; }
         
-        button { padding: 12px 18px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; }
+        button { padding: 12px 18px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; }
+        button:hover { transform: translateY(-2px); }
         .btn-add { background: #1a73e8; }
         .btn-save { background: #1e8e3e; }
         .btn-load { background: #007bff; }
@@ -85,9 +87,8 @@
     </div>
 
     <script>
-        // Funkce pro bezpečné vložení češtiny bez otazníků
+        // Neprůstřelná čeština přes kódování
         const cz = (s) => decodeURIComponent(escape(s));
-        
         document.getElementById('addBtn').textContent = cz("Nov\xE1 my\u0161lenka");
         document.getElementById('saveBtn').textContent = cz("Ulo\u017Eit");
         document.getElementById('loadBtn').textContent = cz("Otev\u0159\u00EDt");
@@ -124,7 +125,7 @@
                     const dx = n2.x - n1.x; const dy = n2.y - n1.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist < 180) {
-                        const force = (180 - dist) / 50;
+                        const force = (180 - dist) / 60;
                         n1.x -= (dx / dist) * force; n1.y -= (dy / dist) * force;
                         n2.x += (dx / dist) * force; n2.y += (dy / dist) * force;
                     }
@@ -171,9 +172,7 @@
             const conn = document.createElement('div');
             conn.className = 'connector';
             conn.onmousedown = (e) => { e.stopPropagation(); e.preventDefault(); drawingLineFrom = nodes.find(n => n.el === el); };
-
-            el.appendChild(picker);
-            el.appendChild(conn);
+            el.appendChild(picker); el.appendChild(conn);
 
             el.ondblclick = (e) => {
                 e.stopPropagation();
@@ -182,11 +181,7 @@
                 content.focus();
             };
 
-            content.onblur = () => {
-                el.setAttribute('data-editing', 'false');
-                content.contentEditable = "false";
-                saveToLocalStorage();
-            };
+            content.onblur = () => { el.setAttribute('data-editing', 'false'); content.contentEditable = "false"; saveToLocalStorage(); };
 
             el.onmousedown = (e) => {
                 if (el.getAttribute('data-editing') === "true") return;
@@ -196,8 +191,7 @@
                 let bStartY = e.clientY / scale - y;
                 const move = (ev) => { 
                     const node = nodes.find(n => n.el === el); 
-                    node.x = (ev.clientX / scale - bStartX); 
-                    node.y = (ev.clientY / scale - bStartY); 
+                    node.x = (ev.clientX / scale - bStartX); node.y = (ev.clientY / scale - bStartY); 
                 };
                 document.addEventListener('mousemove', move);
                 document.onmouseup = () => document.removeEventListener('mousemove', move);
@@ -253,17 +247,18 @@
         function drawCurve(x1, y1, x2, y2, c1, c2) {
             const grad = ctx.createLinearGradient(x1, y1, x2, y2);
             grad.addColorStop(0, c1); grad.addColorStop(1, c2);
-            ctx.strokeStyle = grad; ctx.beginPath(); ctx.moveTo(x1, y1);
+            ctx.strokeStyle = grad; ctx.shadowBlur = 15; ctx.shadowColor = c1;
+            ctx.beginPath(); ctx.moveTo(x1, y1);
             ctx.bezierCurveTo(x1 + (x2 - x1) * 0.5, y1, x1 + (x2 - x1) * 0.5, y2, x2, y2);
-            ctx.stroke();
+            ctx.stroke(); ctx.shadowBlur = 0;
         }
 
         function saveToLocalStorage() {
             const data = nodes.map(n => ({ x: n.x, y: n.y, text: n.el.querySelector('.bubble-content').innerText, color: n.color, autoParentIdx: nodes.indexOf(n.autoParent), manualParentIndices: n.manualParents.map(p => nodes.indexOf(p)) }));
-            localStorage.setItem('myNeonCzechFix', JSON.stringify(data));
+            localStorage.setItem('myNeonHybridFinal', JSON.stringify(data));
         }
 
-        function exportToFile() { saveToLocalStorage(); const data = localStorage.getItem('myNeonCzechFix'); const blob = new Blob([data], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'projekt.json'; a.click(); }
+        function exportToFile() { saveToLocalStorage(); const data = localStorage.getItem('myNeonHybridFinal'); const blob = new Blob([data], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'projekt.json'; a.click(); }
         function importFromFile(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => loadFromData(JSON.parse(e.target.result)); reader.readAsText(file); }
 
         function loadFromData(data) {
@@ -272,7 +267,7 @@
             data.forEach((d, i) => { if (d.autoParentIdx !== -1) nodes[i].autoParent = nodes[d.autoParentIdx]; d.manualParentIndices.forEach(idx => nodes[i].manualParents.push(nodes[idx])); });
         }
 
-        window.onload = () => { const saved = localStorage.getItem('myNeonCzechFix'); if (saved) loadFromData(JSON.parse(saved)); applyPhysics(); };
+        window.onload = () => { const saved = localStorage.getItem('myNeonHybridFinal'); if (saved) loadFromData(JSON.parse(saved)); applyPhysics(); };
     </script>
 </body>
 </html>
