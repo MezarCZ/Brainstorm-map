@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Brainstorming Neon - Ultimate Fixed</title>
+    <title>Brainstorming Neon - Ultimate Fix</title>
     <style>
         body { 
             margin: 0; padding: 0; overflow: hidden; 
@@ -15,32 +15,23 @@
 
         .bubble { 
             min-width: 140px; min-height: 50px;
-            color: #ffffff;
-            border: 2px solid rgba(255,255,255,0.1); border-radius: 16px; 
-            position: absolute; cursor: move; 
+            color: #ffffff; border: 2px solid rgba(255,255,255,0.1); border-radius: 16px; 
+            position: absolute; cursor: move; display: flex; align-items: center; justify-content: center;
             box-shadow: 0 0 15px rgba(0,0,0,0.5); z-index: 2; outline: none;
-            display: flex; align-items: center; justify-content: center;
-            backdrop-filter: blur(4px);
-            font-weight: bold; transition: box-shadow 0.3s, border-color 0.3s;
+            backdrop-filter: blur(4px); font-weight: bold; transition: box-shadow 0.3s;
         }
 
         .bubble-content {
-            width: 100%; height: 100%;
-            display: flex; align-items: center; justify-content: center;
-            padding: 10px; box-sizing: border-box;
-            outline: none; pointer-events: none;
+            width: 100%; padding: 10px; outline: none; pointer-events: none;
         }
         
         .bubble[data-editing="true"] { border-color: white !important; box-shadow: 0 0 25px rgba(255,255,255,0.5); }
-        .bubble[data-editing="true"] .bubble-content { 
-            pointer-events: auto; cursor: text; user-select: text;
-        }
+        .bubble[data-editing="true"] .bubble-content { pointer-events: auto; cursor: text; user-select: text; }
 
         .cell-picker {
             position: absolute; top: -45px; left: 50%; transform: translateX(-50%);
             display: none; gap: 8px; background: rgba(0,0,0,0.9); 
-            padding: 6px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);
-            z-index: 20; pointer-events: auto;
+            padding: 6px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); z-index: 20;
         }
         .bubble:hover .cell-picker, .bubble:focus-within .cell-picker { display: flex; }
         .cell-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.3); }
@@ -48,8 +39,7 @@
         .connector {
             width: 14px; height: 14px; background: white; border-radius: 50%;
             position: absolute; bottom: -7px; left: calc(50% - 7px); cursor: crosshair;
-            opacity: 0; transition: opacity 0.2s; z-index: 10; pointer-events: auto;
-            box-shadow: 0 0 8px white;
+            opacity: 0; transition: opacity 0.2s; z-index: 10; box-shadow: 0 0 8px white;
         }
         .bubble:hover .connector { opacity: 1; }
 
@@ -69,7 +59,7 @@
 
     <div class="controls-left">
         <button class="btn-add" id="addBtn">Add</button>
-        <div id="picker-container" style="display: flex; gap: 8px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 12px;"></div>
+        <div id="picker-container" style="display: flex; gap: 8px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);"></div>
     </div>
 
     <div class="controls-right">
@@ -87,7 +77,6 @@
     </div>
 
     <script>
-        // Neprůstřelná čeština přes kódování
         const cz = (s) => decodeURIComponent(escape(s));
         document.getElementById('addBtn').textContent = cz("Nov\xE1 my\u0161lenka");
         document.getElementById('saveBtn').textContent = cz("Ulo\u017Eit");
@@ -107,7 +96,7 @@
         const pickerCont = document.getElementById('picker-container');
         PALETTE.forEach(c => {
             const d = document.createElement('div');
-            d.style.width = '28px'; d.style.height = '28px'; d.style.borderRadius = '50%';
+            d.style.width = '24px'; d.style.height = '24px'; d.style.borderRadius = '50%';
             d.style.background = c; d.style.cursor = 'pointer'; d.style.border = '2px solid transparent';
             if(c === currentColor) d.style.borderColor = 'white';
             d.onclick = () => {
@@ -174,25 +163,15 @@
             conn.onmousedown = (e) => { e.stopPropagation(); e.preventDefault(); drawingLineFrom = nodes.find(n => n.el === el); };
             el.appendChild(picker); el.appendChild(conn);
 
-            el.ondblclick = (e) => {
-                e.stopPropagation();
-                el.setAttribute('data-editing', 'true');
-                content.contentEditable = "true";
-                content.focus();
-            };
-
+            el.ondblclick = (e) => { e.stopPropagation(); el.setAttribute('data-editing', 'true'); content.contentEditable = "true"; content.focus(); };
             content.onblur = () => { el.setAttribute('data-editing', 'false'); content.contentEditable = "false"; saveToLocalStorage(); };
 
             el.onmousedown = (e) => {
                 if (el.getAttribute('data-editing') === "true") return;
                 if (e.button === 2) { deleteNode(el); return; }
                 e.stopPropagation();
-                let bStartX = e.clientX / scale - x;
-                let bStartY = e.clientY / scale - y;
-                const move = (ev) => { 
-                    const node = nodes.find(n => n.el === el); 
-                    node.x = (ev.clientX / scale - bStartX); node.y = (ev.clientY / scale - bStartY); 
-                };
+                let bStartX = e.clientX / scale - x; let bStartY = e.clientY / scale - y;
+                const move = (ev) => { const node = nodes.find(n => n.el === el); node.x = (ev.clientX / scale - bStartX); node.y = (ev.clientY / scale - bStartY); };
                 document.addEventListener('mousemove', move);
                 document.onmouseup = () => document.removeEventListener('mousemove', move);
             };
@@ -203,21 +182,17 @@
                     if (!target.manualParents.includes(drawingLineFrom)) { target.manualParents.push(drawingLineFrom); saveToLocalStorage(); }
                 }
             };
-            
             el.oncontextmenu = (e) => e.preventDefault();
             world.appendChild(el);
             return el;
         }
 
         function updateBubbleStyle(el, color) {
-            el.style.background = color + "CC";
-            el.style.borderColor = color;
-            el.style.boxShadow = `0 0 20px ${color}66`;
+            el.style.background = color + "CC"; el.style.borderColor = color; el.style.boxShadow = `0 0 20px ${color}66`;
         }
 
         function deleteNode(el) {
-            el.remove();
-            nodes = nodes.filter(n => n.el !== el);
+            el.remove(); nodes = nodes.filter(n => n.el !== el);
             nodes.forEach(n => n.manualParents = n.manualParents.filter(p => p.el !== el));
             saveToLocalStorage();
         }
@@ -233,10 +208,8 @@
         }
 
         function drawLines() {
-            canvas.width = 10000; canvas.height = 10000;
-            canvas.style.left = "-5000px"; canvas.style.top = "-5000px";
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.lineWidth = 4;
+            canvas.width = 10000; canvas.height = 10000; canvas.style.left = "-5000px"; canvas.style.top = "-5000px";
+            ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.lineWidth = 4;
             nodes.forEach(node => {
                 if (node.autoParent) drawCurve(node.autoParent.x + node.autoParent.el.offsetWidth/2 + 5000, node.autoParent.y + node.autoParent.el.offsetHeight/2 + 5000, node.x + node.el.offsetWidth/2 + 5000, node.y + node.el.offsetHeight/2 + 5000, node.autoParent.color, node.color);
                 node.manualParents.forEach(p => drawCurve(p.x + p.el.offsetWidth/2 + 5000, p.y + p.el.offsetHeight/2 + 5000, node.x + node.el.offsetWidth/2 + 5000, node.y + node.el.offsetHeight/2 + 5000, p.color, node.color));
@@ -255,10 +228,10 @@
 
         function saveToLocalStorage() {
             const data = nodes.map(n => ({ x: n.x, y: n.y, text: n.el.querySelector('.bubble-content').innerText, color: n.color, autoParentIdx: nodes.indexOf(n.autoParent), manualParentIndices: n.manualParents.map(p => nodes.indexOf(p)) }));
-            localStorage.setItem('myNeonHybridFinal', JSON.stringify(data));
+            localStorage.setItem('myNeonHybridV5', JSON.stringify(data));
         }
 
-        function exportToFile() { saveToLocalStorage(); const data = localStorage.getItem('myNeonHybridFinal'); const blob = new Blob([data], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'projekt.json'; a.click(); }
+        function exportToFile() { saveToLocalStorage(); const data = localStorage.getItem('myNeonHybridV5'); const blob = new Blob([data], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'projekt.json'; a.click(); }
         function importFromFile(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => loadFromData(JSON.parse(e.target.result)); reader.readAsText(file); }
 
         function loadFromData(data) {
@@ -267,7 +240,7 @@
             data.forEach((d, i) => { if (d.autoParentIdx !== -1) nodes[i].autoParent = nodes[d.autoParentIdx]; d.manualParentIndices.forEach(idx => nodes[i].manualParents.push(nodes[idx])); });
         }
 
-        window.onload = () => { const saved = localStorage.getItem('myNeonHybridFinal'); if (saved) loadFromData(JSON.parse(saved)); applyPhysics(); };
+        window.onload = () => { const saved = localStorage.getItem('myNeonHybridV5'); if (saved) loadFromData(JSON.parse(saved)); applyPhysics(); };
     </script>
 </body>
 </html>
